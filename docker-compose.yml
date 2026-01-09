@@ -2,7 +2,10 @@ version: '3.8'
 
 services:
   web:
-    build: .
+    build:
+      context: .
+      args:
+        GEMINI_API_KEY: ${GEMINI_API_KEY}
     ports:
       - "9595:80"
     restart: always
