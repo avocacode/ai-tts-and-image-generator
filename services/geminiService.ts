@@ -89,9 +89,9 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
 /**
  * Generates Narration Audio using Gemini TTS
  */
-export const generateNarration = async (text: string): Promise<string> => {
+export const generateNarration = async (text: string, apiKey: string): Promise<string> => {
   // Always create new instance to get fresh key
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
@@ -129,8 +129,8 @@ export const generateNarration = async (text: string): Promise<string> => {
  * Generates Static Image using Gemini 2.5 Flash
  * Updated to 16:9 for YouTube
  */
-export const generateImage = async (prompt: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+export const generateImage = async (prompt: string, apiKey: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: {
