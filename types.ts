@@ -5,6 +5,8 @@ declare global {
   }
 }
 
+export type GenerationMode = 'both' | 'image' | 'narration';
+
 export interface GenerationState {
   isGenerating: boolean;
   stage: 'idle' | 'generating-audio' | 'generating-visuals' | 'complete' | 'error';
@@ -13,10 +15,11 @@ export interface GenerationState {
 }
 
 export interface GeneratedContent {
-  audioUrl: string | null;
-  imageUrl: string | null;
+  audioUrl?: string | null;
+  imageUrl?: string | null;
   narrationText: string;
   visualPrompt: string;
+  mode: GenerationMode;
 }
 
 export interface IconProps {

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { generateNarration, generateImage } from './services/geminiService';
-import { GeneratedContent, GenerationState } from './types';
+import { GeneratedContent, GenerationState, GenerationMode } from './types';
 import { PlayIcon, PauseIcon, VideoIcon, SparklesIcon, DownloadIcon, PhotoIcon } from './components/Icons';
 
 const App: React.FC = () => {
@@ -8,6 +8,7 @@ const App: React.FC = () => {
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [narrationInput, setNarrationInput] = useState('');
   const [visualPromptInput, setVisualPromptInput] = useState('');
+  const [generationMode, setGenerationMode] = useState<GenerationMode>('both');
 
   const [generationState, setGenerationState] = useState<GenerationState>({
     isGenerating: false,
@@ -50,11 +51,24 @@ const App: React.FC = () => {
       return;
     }
 
-    if (!narrationInput.trim() || !visualPromptInput.trim()) {
+    const needsNarration = generationMode === 'both' || generationMode === 'narration';
+    const needsImage = generationMode === 'both' || generationMode === 'image';
+
+    if (needsNarration && !narrationInput.trim()) {
       setGenerationState({
         isGenerating: false,
         stage: 'error',
-        error: "Please provide both narration text and a visual description.",
+        error: "Please provide narration text.",
+        progressMessage: ''
+      });
+      return;
+    }
+
+    if (needsImage && !visualPromptInput.trim()) {
+      setGenerationState({
+        isGenerating: false,
+        stage: 'error',
+        error: "Please provide a visual description.",
         progressMessage: ''
       });
       return;
@@ -62,30 +76,40 @@ const App: React.FC = () => {
 
     setGenerationState({
       isGenerating: true,
-      stage: 'generating-audio',
+      stage: needsNarration ? 'generating-audio' : 'generating-visuals',
       error: null,
-      progressMessage: 'Generating Voiceover (TTS)...'
+      progressMessage: needsNarration ? 'Generating Voiceover (TTS)...' : 'Generating Visuals...'
     });
 
     try {
-      // 1. Generate Audio
-      const audioUrl = await generateNarration(narrationInput, apiKey);
+      let audioUrl = null;
+      let imageUrl = null;
 
-      setGenerationState(prev => ({
-        ...prev,
-        stage: 'generating-visuals',
-        progressMessage: 'Generating 16:9 Visuals with Gemini Flash...'
-      }));
+      // 1. Generate Audio if needed
+      if (needsNarration) {
+        audioUrl = await generateNarration(narrationInput, apiKey);
 
-      // 2. Generate Image (Horizontal)
-      const imageUrl = await generateImage(visualPromptInput, apiKey);
+        if (needsImage) {
+          setGenerationState(prev => ({
+            ...prev,
+            stage: 'generating-visuals',
+            progressMessage: 'Generating 16:9 Visuals with Gemini Flash...'
+          }));
+        }
+      }
+
+      // 2. Generate Image if needed
+      if (needsImage) {
+        imageUrl = await generateImage(visualPromptInput, apiKey);
+      }
 
       // 3. Complete
       setResult({
         audioUrl,
         imageUrl,
         narrationText: narrationInput,
-        visualPrompt: visualPromptInput
+        visualPrompt: visualPromptInput,
+        mode: generationMode
       });
 
       setGenerationState({
@@ -228,40 +252,68 @@ const App: React.FC = () => {
           </p>
         </section>
 
+        {/* Mode Selection */}
+        <section className="flex justify-center">
+          <div className="bg-gray-900/50 p-1 rounded-xl border border-white/5 flex gap-1">
+            <button
+              onClick={() => setGenerationMode('both')}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${generationMode === 'both' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              Both
+            </button>
+            <button
+              onClick={() => setGenerationMode('narration')}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${generationMode === 'narration' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              Narration Only
+            </button>
+            <button
+              onClick={() => setGenerationMode('image')}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${generationMode === 'image' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              Image Only
+            </button>
+          </div>
+        </section>
+
         {/* Input Form */}
         {!result && (
           <div className={`space-y-8 transition-opacity duration-500 ${generationState.isGenerating ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
 
             {/* Step 1: Narration */}
-            <div className="bg-gray-900/50 border border-white/5 rounded-2xl p-6 sm:p-8 backdrop-blur-sm relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-1 h-full bg-purple-500 group-hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-shadow"></div>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 text-xs">1</span>
-                Narration Script
-              </h3>
-              <textarea
-                value={narrationInput}
-                onChange={(e) => setNarrationInput(e.target.value)}
-                placeholder="Enter the fact or story (e.g., 'Did you know that octopuses have three hearts? Two pump blood to the gills, while the third pumps it to the rest of the body...')"
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 min-h-[120px] resize-none"
-              />
-              <p className="text-right text-xs text-gray-500 mt-2">{narrationInput.length} chars</p>
-            </div>
+            {(generationMode === 'both' || generationMode === 'narration') && (
+              <div className="bg-gray-900/50 border border-white/5 rounded-2xl p-6 sm:p-8 backdrop-blur-sm relative overflow-hidden group animate-fade-in">
+                <div className="absolute top-0 left-0 w-1 h-full bg-purple-500 group-hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-shadow"></div>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 text-xs">1</span>
+                  Narration Script
+                </h3>
+                <textarea
+                  value={narrationInput}
+                  onChange={(e) => setNarrationInput(e.target.value)}
+                  placeholder="Enter the fact or story (e.g., 'Did you know that octopuses have three hearts? Two pump blood to the gills, while the third pumps it to the rest of the body...')"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 min-h-[120px] resize-none"
+                />
+                <p className="text-right text-xs text-gray-500 mt-2">{narrationInput.length} chars</p>
+              </div>
+            )}
 
             {/* Step 2: Visuals */}
-            <div className="bg-gray-900/50 border border-white/5 rounded-2xl p-6 sm:p-8 backdrop-blur-sm relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-1 h-full bg-pink-500 group-hover:shadow-[0_0_20px_rgba(236,72,153,0.4)] transition-shadow"></div>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-pink-500/20 text-pink-400 text-xs">2</span>
-                Image Visual Prompt
-              </h3>
-              <textarea
-                value={visualPromptInput}
-                onChange={(e) => setVisualPromptInput(e.target.value)}
-                placeholder="Describe the image scene (e.g., 'A cinematic underwater shot of a majestic octopus with three glowing hearts visible, photorealistic, 8k resolution')"
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-pink-500/50 min-h-[100px] resize-none"
-              />
-            </div>
+            {(generationMode === 'both' || generationMode === 'image') && (
+              <div className="bg-gray-900/50 border border-white/5 rounded-2xl p-6 sm:p-8 backdrop-blur-sm relative overflow-hidden group animate-fade-in">
+                <div className="absolute top-0 left-0 w-1 h-full bg-pink-500 group-hover:shadow-[0_0_20px_rgba(236,72,153,0.4)] transition-shadow"></div>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-pink-500/20 text-pink-400 text-xs">{generationMode === 'both' ? '2' : '1'}</span>
+                  Image Visual Prompt
+                </h3>
+                <textarea
+                  value={visualPromptInput}
+                  onChange={(e) => setVisualPromptInput(e.target.value)}
+                  placeholder="Describe the image scene (e.g., 'A cinematic underwater shot of a majestic octopus with three glowing hearts visible, photorealistic, 8k resolution')"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-pink-500/50 min-h-[100px] resize-none"
+                />
+              </div>
+            )}
 
             {/* Error Message */}
             {generationState.error && (
@@ -301,63 +353,83 @@ const App: React.FC = () => {
           <div className="animate-fade-in space-y-8">
             <div className="bg-gray-900 border border-white/10 rounded-3xl p-6 shadow-2xl overflow-hidden">
 
-              {/* Horizontal 16:9 Player */}
-              <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-lg mx-auto mb-8 border border-white/5">
-                {result.imageUrl ? (
+              {/* Horizontal 16:9 Player / Image Display */}
+              {result.imageUrl ? (
+                <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-lg mx-auto mb-8 border border-white/5">
                   <img
                     src={result.imageUrl}
                     className={`w-full h-full object-cover transition-transform duration-[40s] ease-linear ${isPlaying ? 'scale-125' : 'scale-100'}`}
                     alt="Generated visual"
                   />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-500">Generation Failed</div>
-                )}
 
-                {/* Overlay Controls */}
-                <div className="absolute inset-0 bg-black/20 hover:bg-black/10 transition-colors flex items-center justify-center group cursor-pointer" onClick={togglePlay}>
-                  <div className="bg-white/10 backdrop-blur-md p-6 rounded-full group-hover:scale-110 transition-transform shadow-2xl">
-                    {isPlaying ? <PauseIcon className="w-10 h-10 text-white" /> : <PlayIcon className="w-10 h-10 text-white ml-1" />}
-                  </div>
+                  {/* Overlay Controls for Audio */}
+                  {result.audioUrl && (
+                    <div className="absolute inset-0 bg-black/20 hover:bg-black/10 transition-colors flex items-center justify-center group cursor-pointer" onClick={togglePlay}>
+                      <div className="bg-white/10 backdrop-blur-md p-6 rounded-full group-hover:scale-110 transition-transform shadow-2xl">
+                        {isPlaying ? <PauseIcon className="w-10 h-10 text-white" /> : <PlayIcon className="w-10 h-10 text-white ml-1" />}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              ) : result.audioUrl ? (
+                <div className="w-full aspect-video bg-gray-800 rounded-xl flex flex-col items-center justify-center gap-6 mb-8 border border-white/5 bg-gradient-to-br from-gray-800 to-gray-900">
+                  <div className="bg-purple-500/20 p-8 rounded-full">
+                    <VideoIcon className="w-16 h-16 text-purple-400" />
+                  </div>
+                  <button
+                    onClick={togglePlay}
+                    className="flex items-center gap-3 bg-white text-gray-900 px-8 py-3 rounded-full font-bold hover:bg-gray-200 transition-colors"
+                  >
+                    {isPlaying ? <><PauseIcon className="w-5 h-5" /> Pause Audio</> : <><PlayIcon className="w-5 h-5" /> Play Audio</>}
+                  </button>
+                </div>
+              ) : null}
 
               {/* Controls & Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
-                  <div>
-                    <h3 className="text-purple-400 text-sm font-bold uppercase tracking-wider mb-2">Narration Script</h3>
-                    <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5 text-gray-300 italic leading-relaxed h-[150px] overflow-y-auto custom-scrollbar">
-                      "{result.narrationText}"
+                  {result.narrationText && (
+                    <div>
+                      <h3 className="text-purple-400 text-sm font-bold uppercase tracking-wider mb-2">Narration Script</h3>
+                      <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5 text-gray-300 italic leading-relaxed h-[150px] overflow-y-auto custom-scrollbar">
+                        "{result.narrationText}"
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="space-y-6 flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-pink-400 text-sm font-bold uppercase tracking-wider mb-2">Visual Prompt</h3>
-                    <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5 text-gray-400 text-sm">
-                      {result.visualPrompt}
+                  {result.visualPrompt && (
+                    <div>
+                      <h3 className="text-pink-400 text-sm font-bold uppercase tracking-wider mb-2">Visual Prompt</h3>
+                      <div className="p-4 bg-gray-800/50 rounded-xl border border-white/5 text-gray-400 text-sm">
+                        {result.visualPrompt}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="flex flex-col gap-3">
                     {/* Download Helper */}
                     <div className="flex gap-2">
-                      <a
-                        href={result.imageUrl || '#'}
-                        download="generated-image.png"
-                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-medium transition-colors"
-                      >
-                        <PhotoIcon className="w-4 h-4" /> Save Image
-                      </a>
+                      {result.imageUrl && (
+                        <a
+                          href={result.imageUrl}
+                          download="generated-image.png"
+                          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-medium transition-colors"
+                        >
+                          <PhotoIcon className="w-4 h-4" /> Save Image
+                        </a>
+                      )}
 
-                      <a
-                        href={result.audioUrl || '#'}
-                        download="generated-audio.wav"
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-medium transition-colors ${!result.audioUrl ? 'opacity-50 pointer-events-none' : ''}`}
-                      >
-                        <DownloadIcon className="w-4 h-4" /> Save Audio
-                      </a>
+                      {result.audioUrl && (
+                        <a
+                          href={result.audioUrl}
+                          download="generated-audio.wav"
+                          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-medium transition-colors"
+                        >
+                          <DownloadIcon className="w-4 h-4" /> Save Audio
+                        </a>
+                      )}
                     </div>
                     <button
                       onClick={reset}
