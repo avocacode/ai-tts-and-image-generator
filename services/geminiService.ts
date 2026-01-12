@@ -104,7 +104,7 @@ export const generateNarration = async (text: string, apiKey: string, speakingRa
             voiceName: voiceName
           }, // 'Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'
         },
-        speakingRate: speakingRate,
+        speaking_rate: speakingRate,
       },
     },
   });
