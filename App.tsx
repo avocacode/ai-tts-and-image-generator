@@ -8,6 +8,8 @@ const App: React.FC = () => {
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [narrationInput, setNarrationInput] = useState('');
   const [visualPromptInput, setVisualPromptInput] = useState('');
+  const [speakingRate, setSpeakingRate] = useState(1.0);
+  const [selectedVoice, setSelectedVoice] = useState('Kore');
   const [generationMode, setGenerationMode] = useState<GenerationMode>('both');
 
   const [generationState, setGenerationState] = useState<GenerationState>({
@@ -87,7 +89,7 @@ const App: React.FC = () => {
 
       // 1. Generate Audio if needed
       if (needsNarration) {
-        audioUrl = await generateNarration(narrationInput, apiKey);
+        audioUrl = await generateNarration(narrationInput, apiKey, speakingRate, selectedVoice);
 
         if (needsImage) {
           setGenerationState(prev => ({
@@ -294,7 +296,37 @@ const App: React.FC = () => {
                   placeholder="Enter the fact or story (e.g., 'Did you know that octopuses have three hearts? Two pump blood to the gills, while the third pumps it to the rest of the body...')"
                   className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 min-h-[120px] resize-none"
                 />
-                <p className="text-right text-xs text-gray-500 mt-2">{narrationInput.length} chars</p>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-4">
+                  <div className="flex items-center gap-4 flex-1 w-full sm:w-auto">
+                    <span className="text-xs font-bold text-purple-400 uppercase tracking-wider whitespace-nowrap">Speed: {speakingRate}x</span>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="2.0"
+                      step="0.1"
+                      value={speakingRate}
+                      onChange={(e) => setSpeakingRate(parseFloat(e.target.value))}
+                      className="flex-1 h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">{narrationInput.length} chars</p>
+                </div>
+
+                {/* Voice Selection */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4">
+                  {(['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'] as const).map((voice) => (
+                    <button
+                      key={voice}
+                      onClick={() => setSelectedVoice(voice)}
+                      className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all ${selectedVoice === voice
+                          ? 'bg-purple-600 border-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]'
+                          : 'bg-black/20 border-white/5 text-gray-400 hover:border-white/20 hover:text-white'
+                        }`}
+                    >
+                      {voice}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

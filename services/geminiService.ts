@@ -89,10 +89,10 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
 /**
  * Generates Narration Audio using Gemini TTS
  */
-export const generateNarration = async (text: string, apiKey: string): Promise<string> => {
+export const generateNarration = async (text: string, apiKey: string, speakingRate: number = 1.0, voiceName: string = 'Kore'): Promise<string> => {
   // Always create new instance to get fresh key
   const ai = new GoogleGenAI({ apiKey });
-  
+
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
     contents: [{ parts: [{ text: text }] }],
@@ -100,14 +100,17 @@ export const generateNarration = async (text: string, apiKey: string): Promise<s
       responseModalities: [Modality.AUDIO],
       speechConfig: {
         voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: 'Kore' }, // 'Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'
+          prebuiltVoiceConfig: {
+            voiceName: voiceName
+          }, // 'Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'
         },
+        speakingRate: speakingRate,
       },
     },
   });
 
   const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  
+
   if (!base64Audio) {
     throw new Error("No audio data returned from API");
   }
@@ -140,24 +143,24 @@ export const generateImage = async (prompt: string, apiKey: string): Promise<str
     },
     config: {
       imageConfig: {
-          aspectRatio: "16:9", // Horizontal for YouTube
+        aspectRatio: "16:9", // Horizontal for YouTube
       },
     },
   });
 
   let imageUrl = '';
   if (response.candidates?.[0]?.content?.parts) {
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-          const base64EncodeString: string = part.inlineData.data;
-          imageUrl = `data:image/png;base64,${base64EncodeString}`;
-          break;
-        }
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        const base64EncodeString: string = part.inlineData.data;
+        imageUrl = `data:image/png;base64,${base64EncodeString}`;
+        break;
       }
+    }
   }
 
   if (!imageUrl) {
-      throw new Error("No image generated.");
+    throw new Error("No image generated.");
   }
   return imageUrl;
 }
