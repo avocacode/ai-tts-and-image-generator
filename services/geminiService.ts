@@ -93,9 +93,17 @@ export const generateNarration = async (text: string, apiKey: string, speakingRa
   // Always create new instance to get fresh key
   const ai = new GoogleGenAI({ apiKey });
 
+  // Use natural language "Director's Notes" for speed as the JSON parameter is not yet supported in AI Studio SDK
+  let promptText = text;
+  if (speakingRate < 0.9) {
+    promptText = `(Speak slowly and calmly) ${text}`;
+  } else if (speakingRate > 1.1) {
+    promptText = `(Speak faster and with more energy) ${text}`;
+  }
+
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
-    contents: [{ parts: [{ text: text }] }],
+    contents: [{ parts: [{ text: promptText }] }],
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
@@ -104,7 +112,6 @@ export const generateNarration = async (text: string, apiKey: string, speakingRa
             voiceName: voiceName
           }, // 'Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'
         },
-        speaking_rate: speakingRate,
       },
     },
   });
